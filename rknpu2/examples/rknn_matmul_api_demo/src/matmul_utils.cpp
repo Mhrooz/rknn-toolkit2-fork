@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <vector>
 #include <cmath>
+#include <chrono>
 #include "fp16/Float16.h"
 
 namespace rknpu2
@@ -22,7 +23,9 @@ namespace rknpu2
             return;
         }
         // 设置随机种子
-        srand((unsigned)time(NULL));
+        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+
+        srand(seed);
 
         float min = range[0], max = range[1];
         for (size_t i = 0; i < size; ++i)
@@ -30,9 +33,25 @@ namespace rknpu2
             buffer[i] = static_cast<T>(min + (max - min) * (static_cast<double>(rand()) / RAND_MAX));
         }
     }
+    template <typename T>
+    void generate_fixed_buffer(T *buffer, size_t size, std::vector<float> range)
+        {
+            if (buffer == nullptr || size == 0)
+            {
+                return;
+            }
+            // 设置随机种子
+            srand((unsigned)time(NULL));
 
+            float min = range[0], max = range[1];
+            for (size_t i = 0; i < size; ++i)
+            {
+                buffer[i] = static_cast<T>(i%19);
+            }
+        }
     template void generate_random_buffer(int8_t *buffer, size_t size, std::vector<float> range);
     template void generate_random_buffer(float16 *buffer, size_t size, std::vector<float> range);
+    template void generate_fixed_buffer(float16 *buffer, size_t size, std::vector<float> range);
 
     /**
      * @brief convert norm layout to perf layout

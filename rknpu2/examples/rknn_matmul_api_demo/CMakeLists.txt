@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # skip 3rd-party lib dependencies
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-shlib-undefined")
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # rknn api
 set(RKNN_API_PATH ${CMAKE_SOURCE_DIR}/../../runtime//${CMAKE_SYSTEM_NAME}/librknn_api)
 if(CMAKE_SYSTEM_NAME STREQUAL "Android")
@@ -47,8 +48,29 @@ target_link_libraries(rknn_matmul_api_dynshape_demo
   ${RKNN_RT_LIB}
 )
 
+add_executable(rknn_matmul_bench
+  src/rknn_matmul_bench.cpp
+  src/matmul_utils.cpp
+)
+
+target_link_libraries(rknn_matmul_bench
+  ${RKNN_RT_LIB}
+)
+
+add_executable(micro_kernel_test
+  src/micro_kernel_test.cpp
+  src/matmul_utils.cpp
+)
+
+target_link_libraries(micro_kernel_test
+  ${RKNN_RT_LIB}
+)
+
+
 # install target and libraries
 set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install/rknn_matmul_api_demo_${CMAKE_SYSTEM_NAME})
 install(TARGETS rknn_matmul_api_demo DESTINATION ./)
 install(TARGETS rknn_matmul_api_dynshape_demo DESTINATION ./)
+install(TARGETS rknn_matmul_bench DESTINATION ./)
+install(TARGETS micro_kernel_test DESTINATION ./)
 install(PROGRAMS ${RKNN_RT_LIB} DESTINATION lib)

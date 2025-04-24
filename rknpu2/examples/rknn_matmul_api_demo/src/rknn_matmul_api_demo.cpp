@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <inttypes.h>
 
 #include <string>
 #include <vector>
@@ -472,6 +473,7 @@ int main(int argc, char *argv[])
     print_usage(argv);
     return -1;
   }
+
   // The quantization parameters used in this demo are set for test and the actual scale and zp are based on customer usage scenarios.
   // all scales and zp are the same as those in B per-channel quantization, and the result is the same as the result of per-layer quantization.
   const float A_SCALE = 0.2f;
@@ -484,6 +486,7 @@ int main(int argc, char *argv[])
   int loop_count = 10;
   int print_tensor = 1;
   int iommu_domain_id = 0;
+  bool generate_random = true;
 
   rknn_matmul_type matmul_type = (rknn_matmul_type)atoi(argv[1]);
   // check matmul_type value range
@@ -540,6 +543,12 @@ int main(int argc, char *argv[])
     iommu_domain_id = atoi(argv[8]);
   }
 
+  if (argc > 9)
+  {
+      int tmp = atoi(argv[9]);
+      generate_random = tmp == 0? false:true;
+
+  }
   printf("MatMul matmul_type = %s, M = %d, K = %d, N = %d, B_layout = %d, AC_layout = %d, loop_count = %d, core_mask = "
          "%d, iommu_domain_id = %u\n",
          get_matmul_type_string(matmul_type), M, K, N, B_layout, AC_layout, loop_count, core_mask, iommu_domain_id);
@@ -556,6 +565,7 @@ int main(int argc, char *argv[])
   info.AC_layout = AC_layout;
   info.iommu_domain_id = iommu_domain_id;
 
+  //default is RKNN_INT8_MM_INT8_TO_INT8
   if (matmul_type == RKNN_FLOAT16_MM_INT8_TO_FLOAT32 || matmul_type == RKNN_FLOAT16_MM_INT4_TO_FLOAT32 ||
       matmul_type == RKNN_INT8_MM_INT4_TO_INT32)
   {
@@ -753,8 +763,13 @@ int main(int argc, char *argv[])
     // generate int16 A buffer
     float16 *A_float16_Matrix = (float16 *)A_Matrix;
     float16 *B_float16_Matrix = (float16 *)B_Matrix;
-    generate_random_buffer(A_float16_Matrix, M * K, {-1.f, 1.f});
-    generate_random_buffer(B_float16_Matrix, K * N, {-1.f, 1.f});
+    if(generate_random){
+        generate_random_buffer(A_float16_Matrix, M * K, {-1.f, 1.f});
+        generate_random_buffer(B_float16_Matrix, K * N, {-1.f, 1.f});
+    }else{
+        generate_fixed_buffer(A_float16_Matrix, M * K, {-1.f, 1.f});
+        generate_fixed_buffer(B_float16_Matrix, K * N, {-1.f, 1.f});
+    }
   }
   else if (info.type == RKNN_FLOAT16_MM_INT8_TO_FLOAT32 || info.type == RKNN_FLOAT16_MM_INT4_TO_FLOAT32 ||
            info.type == RKNN_FLOAT16_MM_INT4_TO_FLOAT16)
@@ -770,6 +785,7 @@ int main(int argc, char *argv[])
     int8_t *B_int8_Matrix = (int8_t *)B_Matrix;
     generate_random_buffer(A_float16_Matrix, M * K, {-1.f, 1.f});
     generate_random_buffer(B_int8_Matrix, K * N, {-8, 7});
+
   }
   else if (info.type == RKNN_INT8_MM_INT4_TO_INT32)
   {
@@ -954,7 +970,15 @@ int main(int argc, char *argv[])
     printf("%4d: Elapse Time = %.2fms, FPS = %.2f\n", i, elapse_us / 1000.f, 1000.f * 1000.f / elapse_us);
   }
   int64_t average_us = total_us / loop_count;
-  printf("Average Time = %.2fms, Average FPS = %.2f\n", average_us / 1000.f, 1000.f * 1000.f / average_us);
+  printf("Average Time = %.2fms, Average FPS = %.2f \n", average_us / 1000.f, 1000.f * 1000.f / average_us);
+
+  long long operation_counter = M * K ;
+  float average_gflops = (double)operation_counter * 2.f / (average_us * 1000.f) * N;
+  printf("Average GFLOPS = %.2f\n",  (double)operation_counter * 2.f / (average_us * 1000.f) * N);
+
+  FILE * file_pointer;
+  file_pointer = fopen("rknn_npu_results.txt", "a");
+  fprintf(file_pointer, "%d %d %d %d %.2f\n", M, K, N, matmul_type, average_gflops);
 
   // Dump A/B/C tensors
   if (print_tensor != 0)

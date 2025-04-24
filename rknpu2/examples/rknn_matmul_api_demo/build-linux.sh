@@ -3,7 +3,7 @@
 set -e
 
 echo "$0 $@"
-while getopts ":t:a:b" opt; do
+while getopts ":t:a:b:" opt; do
   case $opt in
     t)
       TARGET_SOC=$OPTARG
@@ -54,9 +54,9 @@ else
 fi
 
 # Debug / Release
-if [[ -z ${BUILD_TYPE} ]];then
-    BUILD_TYPE=Release
-fi
+# if [[ -z ${BUILD_TYPE} ]];then
+#     BUILD_TYPE=Release
+# fi
 
 
 case ${TARGET_SOC} in

@@ -11,6 +11,9 @@ namespace rknpu2
     template <typename T>
     void generate_random_buffer(T *buffer, size_t size, std::vector<float> range = {0.0f, 1.0f});
 
+    template <typename T>
+    void generate_fixed_buffer(T *buffer, size_t size, std::vector<float> range = {0.0f, 1.0f});
+
     template <typename Ti, typename To>
     void norm_layout_to_perf_layout(Ti *src, To *dst, int32_t M, int32_t K, int32_t subK, bool isInt4Type);
 
