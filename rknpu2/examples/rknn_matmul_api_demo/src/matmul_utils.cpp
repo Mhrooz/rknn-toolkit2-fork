@@ -46,7 +46,7 @@ namespace rknpu2
             float min = range[0], max = range[1];
             for (size_t i = 0; i < size; ++i)
             {
-                buffer[i] = static_cast<T>(i%19);
+                buffer[i] = static_cast<T>(i%99);
             }
         }
     template void generate_random_buffer(int8_t *buffer, size_t size, std::vector<float> range);

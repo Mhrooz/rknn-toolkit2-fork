@@ -405,6 +405,7 @@ int main(int argc, char * argv[]){
     printf("params: M = %d, K = %d, N = %d, B_layout = %d, AC_layout = %d, loop_count = %d, core_mask = "
            "%d, iommu_domain_id = %u, generate_random = %d\n",
            M, K, N, B_layout, AC_layout, loop_count, core_mask, iommu_domain_id, generate_random);
+    auto start_program_time = getCurrentTimeUs();
     rknn_matmul_ctx ctx;
 
     /*
@@ -440,7 +441,7 @@ int main(int argc, char * argv[]){
         ////////////////////////////////////////////////////////////////////////
     */
 
-    for(int i = 0 ; i < 2 ; i++){
+    for(int i = 0 ; i < 4 ; i++){
       printf("cnt: %d\n", i);
       void *A_Matrix = nullptr;
       void *B_Matrix = nullptr;
@@ -485,8 +486,12 @@ int main(int argc, char * argv[]){
           ////////////////////////////////////////////////////////////////////////
       */
 
+      int64_t copy_start = getCurrentTimeUs();
       memcpy(A->virt_addr, A_Matrix, M * K * sizeof(float16));
       memcpy(B->virt_addr, B_Matrix, K * N * sizeof(float16));
+      int64_t copy_end = getCurrentTimeUs();
+      int64_t copy_elapse = copy_end - copy_start;
+      printf("copy elapse time = %lld us\n", copy_elapse);
 
       /*
           ////////////////////////////////////////////////////////////////////////
@@ -495,6 +500,7 @@ int main(int argc, char * argv[]){
           ////////////////////////////////////////////////////////////////////////
       */
 
+      int64_t set_io_start = getCurrentTimeUs();
       printf("step 6\n");
       ret = rknn_matmul_set_io_mem(ctx, A, &io_attr.A);
       if (ret < 0)
@@ -514,6 +520,9 @@ int main(int argc, char * argv[]){
           fprintf(stderr, "rknn_matmul_set_io_mem fail! ret=%d\n", ret);
           return -1;
       }
+      int64_t set_io_end = getCurrentTimeUs();
+      int64_t set_io_elapse = set_io_end - set_io_start;
+      printf("set io elapse time = %lld us\n", set_io_elapse);
 
       /*
           ////////////////////////////////////////////////////////////////////////
@@ -537,6 +546,20 @@ int main(int argc, char * argv[]){
           }
           printf("%4d: Elapse Time = %.2fms, FPS = %.2f\n", i, elapse_us / 1000.f, 1000.f * 1000.f / elapse_us);
         }
+        auto program_time = getCurrentTimeUs() - start_program_time;
+        int64_t average_us = program_time / loop_count;
+        printf("with overhead Average Time = %.2fms, Average FPS = %.2f \n", average_us / 1000.f, 1000.f * 1000.f / average_us);
+
+        long long operation_counter = M * K ;
+        float average_gflops = (double)operation_counter * 2.f / (average_us * 1000.f) * N;
+        printf("With overhead Average GFLOPS = %.2f\n",  (double)operation_counter * 2.f / (average_us * 1000.f) * N);
+
+        average_us = total_us / loop_count;
+        printf("Average Time = %.2fms, Average FPS = %.2f \n", average_us / 1000.f, 1000.f * 1000.f / average_us);
+
+        average_gflops = (double)operation_counter * 2.f / (average_us * 1000.f) * N;
+        printf("Average GFLOPS = %.2f\n",  (double)operation_counter * 2.f / (average_us * 1000.f) * N);
+
 
         /* 
           ////////////////////////////////////////////////////////////////////////

@@ -897,7 +897,8 @@ int main(int argc, char *argv[])
     }
     else
     {
-      rknn_B_normal_layout_to_native_layout(B_Matrix, B->virt_addr, K, N, &info);
+      norm_layout_to_native_layout(static_cast<float16 *>(B_Matrix), static_cast<float16 *>(B->virt_addr), K, N, subN, subK, false);
+      // rknn_B_normal_layout_to_native_layout(B_Matrix, B->virt_addr, K, N, &info);
     }
   }
   else if (info.B_layout == 2)
