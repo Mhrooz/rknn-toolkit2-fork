@@ -1118,6 +1118,25 @@ int main(int argc, char *argv[])
     cpu_res.reserve(M * N);
     cpu_res = matrixMultiply<float16, float>((const float16 *)A_Matrix, (const float16 *)B_Matrix, M, K, N);
 
+    printf("cpu_res:\n");
+    for (uint32_t i = 0; i < M; ++i)
+    {
+      for (uint32_t j = 0; j < N; ++j)
+      {
+        printf(" %6f", cpu_res[i * N + j]);
+      }
+      printf("\n");
+    }
+    printf("npu_res:\n");
+    for (uint32_t i = 0; i < M; ++i)
+    {
+      for (uint32_t j = 0; j < N; ++j)
+      {
+        printf(" %6f", npu_res[i * N + j]);
+      }
+      printf("\n");
+    }
+
     if (arraysCosineSimilarity<float>(cpu_res, npu_res))
     {
       printf(

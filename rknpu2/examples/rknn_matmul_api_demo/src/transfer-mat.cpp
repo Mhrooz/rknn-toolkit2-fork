@@ -14,16 +14,16 @@
 
 using namespace rknpu2;
 
-bool is_same_matrix(const void *src, const void *dst, int32_t M, int32_t K)
+template <typename T>
+bool is_same_matrix(const T *src, const T *dst, int32_t M, int32_t K)
 {
     for (int i = 0; i < M; i++)
     {
         for (int j = 0; j < K; j++)
         {
-            if (((float16 *)src)[i * K + j] != ((float16 *)dst)[i * K + j])
+            if ((src)[i * K + j] != (dst)[i * K + j])
             {
-                printf("src[%d][%d] = %f, dst[%d][%d] = %f\n", i, j, ((float16 *)src)[i * K + j], i, j,
-                       ((float16 *)dst)[i * K + j]);
+                printf("src[%d][%d] = %f, dst[%d][%d] = %f\n", i, j, (float)(src[i * K + j]), i, j, (float)(dst[i * K + j]));
                 return false;
             }
         }
@@ -48,12 +48,11 @@ void transposed_matrix_to_perf_layout(const void *src, void *dst, int32_t K, int
 }
 
 void perf_matrixC_to_norm_layout(const void *src, void *dst, int32_t M, int32_t N){
-    const int mem_unit = 8;
+    const int mem_unit = 4;
     int dst_offset = 0;
-    for(int outer = 0; outer < N / mem_unit ; outer++){
-        for(int i = 0; i < M; i++){
-            int src_offset = outer * mem_unit + i *N;
-            memcpy((float16 *)dst + dst_offset, (float16 *)src + src_offset, mem_unit * sizeof(float16));
+    for(int i = 0; i < M; i++){
+        for(int outer = 0; outer < N / mem_unit ; outer++){
+            memcpy((float*)dst + dst_offset, (float*)src + outer * mem_unit * M + i * mem_unit, mem_unit * sizeof(float));
             dst_offset += mem_unit;
         }
     }
@@ -280,6 +279,7 @@ int main(int argc, char *argv[])
         A_Matrix = malloc(M * K * sizeof(float16));
         B_Matrix = malloc(K * N * sizeof(float16));
         C_Matrix = malloc(M * N * sizeof(float));
+        memset(C_Matrix, 0, M * N * sizeof(float));
         float16 *A_float16_Matrix = (float16 *)A_Matrix;
         float16 *B_float16_Matrix = (float16 *)B_Matrix;
         if (generate_random)
@@ -316,7 +316,7 @@ int main(int argc, char *argv[])
 
     matrixA_to_perf_layout(A_Matrix, native_A_Matrix, M, K);
 
-    bool same_matrix = is_same_matrix(A->virt_addr, native_A_Matrix, M, K);
+    bool same_matrix = is_same_matrix((float16 *)A->virt_addr, (float16 *)native_A_Matrix, M, K);
     if(same_matrix)
         printf("Matrix A Same!\n");
     else
@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
 
     // check if B->virt_addr is the same as native B
 
-    bool checked = is_same_matrix(B->virt_addr, native_B_Matrix, N, K);
+    bool checked = is_same_matrix((float16*)B->virt_addr, (float16*)native_B_Matrix, N, K);
     if(checked)
         printf("Matrix B Same!\n");
     else
@@ -347,7 +347,7 @@ int main(int argc, char *argv[])
     memcpy(A->virt_addr, native_A_Matrix, M * K * sizeof(float16));
     memcpy(B->virt_addr, native_B_Matrix, K * N * sizeof(float16));
 
-    int ret = rknn_matmul_set_io_mem(ctx, A, &io_attr.A);
+    ret = rknn_matmul_set_io_mem(ctx, A, &io_attr.A);
     ret = rknn_matmul_set_io_mem(ctx, B, &io_attr.B);
     ret = rknn_matmul_set_io_mem(ctx, C, &io_attr.C);
 
@@ -361,9 +361,54 @@ int main(int argc, char *argv[])
     {
         int32_t N_remain = io_attr.C.dims[0];
         int32_t subN = io_attr.C.dims[2];
-        perf_layout_to_norm_layout(static_cast<float16 *>(C->virt_addr), static_cast<float16 *>(C_Matrix), M, N, N_remain, subN);
-        C_Matrix = C_Matrix;
+        printf("N_remain: %d, subN: %d\n", N_remain, subN);
+        perf_layout_to_norm_layout(static_cast<float *>(C->virt_addr), static_cast<float *>(C_Matrix), M, N, N_remain, subN);
     }
+
+    void * C_Matrix_native = malloc(M * N * sizeof(float));
+    perf_matrixC_to_norm_layout(C->virt_addr, C_Matrix_native, M, N);
+    // check if C_Matrix_native is the same as C_Matrix
+    bool checked_C = is_same_matrix((float *)C_Matrix, (float *)C_Matrix_native, M, N);
+    if(checked_C)
+        printf("Matrix C Same!\n");
+    else
+        printf("Matrix C Wrong!\n");
+
+    // printf("A_Matrix\n");
+    // for(int i = 0; i < M; i++){
+    //     for(int j = 0; j < K; j++){
+    //         printf("%.f ", i, j, (float)(((float16 *)A_Matrix)[i * K + j]));
+    //     }
+    //     printf("\n");
+    // }
+    // printf("B_Matrix\n");
+    // for(int i = 0; i < K; i++){
+    //     for(int j = 0; j < N; j++){
+    //         printf("%.f ", i, j, (float)(((float16 *)B_Matrix)[i * N + j]));
+    //     }
+    //     printf("\n");
+    // }
+    // printf("C_result_matrix\n");
+    // for(int i = 0; i < M; i++){
+    //     for(int j = 0; j < N; j++){
+    //         printf("%5.f ", i, j, ((float *)C->virt_addr)[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("C_Matrix\n");
+    // for(int i = 0; i < M; i++){
+    //     for(int j = 0; j < N; j++){
+    //         printf("%5.f ", i, j, ((float *)C_Matrix)[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
+    // printf("C_Matrix_native\n");
+    // for(int i = 0; i < M; i++){
+    //     for(int j = 0; j < N; j++){
+    //         printf("%5.f ", i, j, ((float *)C_Matrix_native)[i * N + j]);
+    //     }
+    //     printf("\n");
+    // }
 
 
     return 0;
